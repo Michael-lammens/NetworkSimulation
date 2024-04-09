@@ -5,7 +5,8 @@ Networking Algorithm Visualizer
 Intro:
 
   Soon to be:   
-    - (Mostly)Portable tool that people can use to visualize their headless networking algorithms
+    - (Mostly) Portable tool to visualize headless networking processes in real time. Adjustable args, concurrent client connections + shared graph.
+    - Split test different algorithms on the same graph
 
     Why i'm building it:
     In building a Vegas simulation I wanted to visualize my program in its real real time running state. For this I didnt want a single use, coupled GUI. I also didnt want to 
