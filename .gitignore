@@ -1,0 +1,6 @@
+*.o
+*.a
+list.h
+list_removers.c
+list_movers.c
+list_adders.c
