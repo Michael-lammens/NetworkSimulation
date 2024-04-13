@@ -1,35 +1,23 @@
-import sys
 import psutil
 
-def kill_processes_on_port(port):
-    processes_killed = False
+def kill_process_by_port(port, process_name):
+    """Kills the process with the given name running on the specified port."""
     for proc in psutil.process_iter(['pid', 'name', 'connections']):
         try:
-            if proc.name() == 'emulate':
-                for conn in proc.connections():
+            if proc.name() == process_name:
+                for conn in proc.connections(kind='inet'):
                     if conn.laddr.port == port:
-                        print(f"Killing process {proc.pid} running on port {port}")
-                        proc.kill()
-                        processes_killed = True
-                        break
-        except psutil.AccessDenied:
-            # Handle processes we don't have permission to access
-            pass
+                        print(f"Killing {process_name} process with PID {proc.pid} on port {port}")
+                        proc.kill()  # terminate the process
+                        return True
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            continue
+    return False
 
-    if not processes_killed:
-        print(f"No processes named 'emulate' found running on port {port}")
+# Ports and process names to check
+process_ports = {32400: 'server', 32582: 'emulate'}
 
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python kill_processes_on_port.py <port>")
-        sys.exit(1)
-
-    try:
-        port = int(sys.argv[1])
-    except ValueError:
-        print("Port must be an integer")
-        sys.exit(1)
-
-    kill_processes_on_port(port)
+# Iterate over the dictionary to kill each required process
+for port, name in process_ports.items():
+    if not kill_process_by_port(port, name):
+        print(f"No {name} process found on port {port}")

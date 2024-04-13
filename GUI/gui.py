@@ -5,9 +5,18 @@ import time
 import tkinter as tk
 import queue
 import random
+import process_flow as flow
+import Exceptions as ExeptGUI
+
+current_directory = os.path.dirname(__file__)
+
+vegascode_directory = os.path.abspath(os.path.join(current_directory, '..', 'VegasCode'))
+
+client_path = os.path.join(vegascode_directory, 'client')
+emulator_path = os.path.join(vegascode_directory, 'emulate')
+server_path = os.path.join(vegascode_directory, 'server')
 
 # Emulator Args
-
 em_bandwidth = "100"  # BPS
 min_rtt = "1"
 delay_d_max = ".1"
@@ -15,9 +24,10 @@ port_emulator = "32582"
 port_server = "32400"
 port_client = "40009"
 num_packets = "1000"
-init_window = "20"
+bytes = "20"
 queue_s = queue.Queue()
 p_open_objects = {}
+all_rec_packets=[]
 
 
 def get_line_if_exists(pipe):
@@ -25,7 +35,7 @@ def get_line_if_exists(pipe):
         line = pipe.readline().strip()
         if line:
             # Put the data into the global queue
-            print("FOUND LINE:", line)  # No need to decode strings
+            #print("FOUND LINE:", line)  # No need to decode strings
             queue_s.put(line)
             return True
     except Exception as e:
@@ -36,21 +46,50 @@ def get_line_if_exists(pipe):
 # todo also get stderr. Pipe = stdout right now
 def read_data_from_c(pipe):
     while True:
-        if not get_line_if_exists(pipe): # conditional for testing purposes
+        if not get_line_if_exists(pipe):  # conditional for testing purposes
             pass
+
+
+def get_log_type(data_log):
+    log_type = data_log.split(" | ", 1)[0]
+    if len(log_type) == 0:
+        raise ExeptGUI.ParseLogNoTypeSpecified
+    return log_type
+
+
+
+def parse_log_to_entry(data_log):
+    data_dict = {}
+    # get data from the global queue
+    data_val_list = str(data_log).split(',')
+    for entry in data_val_list:
+        key, value = entry.split(": ")
+        try:
+            # Convert numeric values from strings to floats or integers
+            if '.' in value:
+                value = float(value)
+            else:
+                value = int(value)
+        except ValueError:
+            pass  # Keep the value as a string if conversion fails
+        data_dict[key.strip()] = value
+    return data_dict
+
 
 
 def update_gui():
     try:
-        # Get data from the global queue
-        data = queue_s.get_nowait()
-        data_str, time_str = data.split(", ")
-        data_data = int(data_str.split(": ")[1])
-        time_data = int(time_str.split(": ")[1])
-        # Process the data and update the GUI
+        logged_line = queue_s.get_nowait()
+        log_type = get_log_type(logged_line)
+        print(log_type)
+        new_entry = parse_log_to_entry(logged_line)
+        all_rec_packets.append(new_entry)
+        print(all_rec_packets)
 
-        data_label.config(text="Data: " + str(data_data))
-        time_label.config(text="Time: " + str(time_data))
+        base_rtt_label.config(text="Base-RTT: " + str(new_entry['Base_RTT']))
+        window_label.config(text="Window Size: " + str(new_entry['WS']))
+        alpha_label.config(text="Alpha: " + str(new_entry['Alpha']))
+        beta_label.config(text="Beta: " + str(new_entry['Beta']))
     except queue.Empty:
         # Queue is empty, do nothing
         pass
@@ -73,9 +112,9 @@ def start_data_display():
 def create_background_processes():
     with open(os.devnull, 'w') as devnull:
         pipe_em = subprocess.Popen(
-            ["./TCPVegasEmulator/emulate", em_bandwidth, min_rtt, delay_d_max, port_emulator, port_server],
+            [emulator_path, em_bandwidth, min_rtt, delay_d_max, port_emulator, port_server],
             stdout=devnull, universal_newlines=True)
-        pipe_serv = subprocess.Popen(["./TCPVegasEmulator/server", port_server],
+        pipe_serv = subprocess.Popen([server_path, port_server],
                                      stdout=devnull, universal_newlines=True)
 
     p_open_objects["emulate"] = pipe_em
@@ -101,18 +140,6 @@ def poll_routine():
             print(f"Server process exited with spite: {server_status}")
             exit(1)
         time.sleep(2)
-
-
-"""
-Function to create a new client
-"""
-
-
-def create_new_client():
-    pipe_client = subprocess.Popen(["./TCPVegasEmulator/client", num_packets, init_window, port_client, port_emulator],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    p_open_objects["client"] = pipe_client
-    return pipe_client
 
 
 # -------------------------------
@@ -164,6 +191,24 @@ root.geometry('{}x{}'.format(SCREEN_WIDTH, SCREEN_HEIGHT))
 main_frame = tk.Frame(root)
 main_frame.pack(fill=tk.BOTH, expand=True)
 
+# -----------------
+# -  DISPLAY DATA -
+# -----------------
+
+# Create a label to display the data
+base_rtt_label = tk.Label(root, text="Base RTT: ")
+base_rtt_label.pack(side=tk.LEFT)
+
+window_label = tk.Label(root, text="Window Size: ")
+window_label.pack(side=tk.LEFT)
+
+alpha_label = tk.Label(root, text="Alpha: ")
+alpha_label.pack(side=tk.LEFT)
+
+beta_label = tk.Label(root, text="Beta: ")
+beta_label.pack(side=tk.LEFT)
+
+
 # create graph container canvas
 canvas_container = tk.Canvas(main_frame, bg="#E8E8E8", width=GRAPH_CONTAINER_WIDTH, height=GRAPH_CONTAINER_HEIGHT)
 canvas_container.pack(side=tk.RIGHT)
@@ -206,17 +251,10 @@ canvas_content.place(x=550, y=123)
 move()
 
 
-# Create a label to display the data
-data_label = tk.Label(root, text="Data: ")
-data_label.pack()
-
-time_label = tk.Label(root, text="Time: ")
-time_label.pack()
 
 # -------------------------------
 # -         THREADING           -
 # -------------------------------
-
 
 # Start a thread to continuously read data from the C program
 create_background_processes()
@@ -226,8 +264,14 @@ read_thread.daemon = True  # Daemonize thread so it automatically dies when the 
 read_thread.start()
 print("Polling BGS")
 
-new_client = create_new_client()
-read_thread = threading.Thread(target=read_data_from_c, args=(new_client.stdout,))
+# test new client object
+
+new_client_instance = flow.client_flow(client_path, num_packets,bytes, "40290", port_emulator)
+new_client_popen = new_client_instance.start_flow()
+print(new_client_popen)
+p_open_objects["client"] = new_client_popen
+
+read_thread = threading.Thread(target=read_data_from_c, args=(new_client_popen.stdout,))
 read_thread.daemon = True  # Daemonize thread so it automatically dies when the main program exits
 read_thread.start()
 
