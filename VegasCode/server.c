@@ -68,9 +68,9 @@ int main(int argc, char *argv[]) {
     /*Bind to server*/
     if (bind(sock_fd_us, (struct sockaddr *)&server_addr, sizeof(server_addr))
                     == -1) {
-        perror("Bind failed");
+        perror("Bind failed server");
         close(sock_fd_us);
-        printf("\nRec and proc failed\n");
+        printf("Rec and proc failed server\n");
         exit(-1);
     }
 

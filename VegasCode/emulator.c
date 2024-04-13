@@ -341,7 +341,7 @@ void *receive_and_process(void *arg) {
     	server_addr.sin_port = htons(emulator->em_port);
     	if (bind(sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr))
 		    == -1) {
-        	perror("Bind failed");
+        	perror("Bind failed emulate");
         	printf("\nFailed to bind at %d",emulator->em_port);
         	close(sock_fd);
 		exit(-1);

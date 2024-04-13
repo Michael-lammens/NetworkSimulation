@@ -253,8 +253,8 @@ void update_window(Segment* temp){
 	double expected = window_size /(double)base_rtt; //(double)base_TP; //window_size/(double)base_rtt; // dmin;
 	double actual =   window_size /(double)(temp->rtt);  //(double)temp->throughput; //window_size/(double)temp->rtt; //temp->rtt;
 	double diff = expected - actual;//expected-actual;
-	/*Add new diff to history. Get new Average*/					/*--------------------*/
-	update_diff_history(diff);						/*DIFFS_10 ------- DIFFS_50------DIFFS_100*/
+	/*Add new diff to history. Get new Average*/					    /*--------------------*/
+	update_diff_history(diff);						                /*DIFFS_10 ------- DIFFS_50------DIFFS_100*/
 	double diff_avg = moving_average(diffs_10,D1_index);			/* Short Term Average. 	Middle Term. 	Longterm       	*/
 	//printf("Moving_Avg_Diffs: %f\n", diff_avg);
 	fflush(stdout);
@@ -267,10 +267,9 @@ void update_window(Segment* temp){
 
 	if(streak_ < window_size){
 		/*Wait until we see the effects of our changes*/
-
 	}else{
 		if(is_max_bps() == 0){
-			printf("hit_max\n");
+			//printf("hit_max\n");
 			fflush(stdout);
 		}else if(diff_avg < alpha){
 			window_size = window_size + 1;
@@ -285,14 +284,9 @@ void update_window(Segment* temp){
 			;/*Keep windowsize the same*/
 		}
 	}
-
-	printf("Pack#: %d,Size: %d, RTT: %f (ED: %f), WS: %d (NEW: %d), diff: %f, Ind TP: %d - Avg TP: %d - End-Time: %s\n",temp->pack_id, PSIZE,temp->rtt,extra_data, temp->ws,window_size,diff, temp->throughput_ind, temp->throughput,temp->end_time);
+	printf("P-LOG | Pack#: %d, Size: %d, RTT: %f, ED: %f, WS: %d, diff: %f, Ind TP: %d, Avg TP: %d, Base_RTT: %f, Base_TP: %f, CUR OUT: %d, expected: %f, actual: %f, Alpha: %f, Beta: %f, end_time: %f\n",temp->pack_id, PSIZE,temp->rtt,extra_data,window_size,diff, temp->throughput_ind, temp->throughput, base_rtt, base_TP, cur_out, expected, actual,alpha, beta, pack->end_time);
 	fflush(stdout);  // Flush the output buffer
-	printf("Base_RTT: %f --- Base_TP: %f --- CUR OUT: %d, expected: %f, actual %f, Alpha: %f, Beta: %f\n", base_rtt, base_TP, cur_out, expected, actual,alpha, beta);
-	fflush(stdout);  // Flush the output buffer
-
 	pthread_mutex_unlock(&window_mtx);
-
 }
 
 void update_throughput(Segment* temp){
@@ -327,9 +321,8 @@ void update_throughput(Segment* temp){
 	double tot_time = cur_time_y - start_time;
 
 	double TP_TOT = total_bytes / tot_time;
-	printf("Total_TP: %f\n",TP_TOT);
-	fflush(stdout);  // Flush the output buffer
-
+	//printf("Total_TP: %f\n",TP_TOT);
+	//fflush(stdout);  // Flush the output buffer
 }
 void update_bps(){
 	char cur_time_x[30];
@@ -357,7 +350,7 @@ void* rec_background_routine(void* arg){
                                       (struct sockaddr *)&client_addr,
                                       &addr_len);
         	if (bytes_received == -1) {
-        	    perror("recvfrom");
+        	    perror("recvfrom\n");
         	    exit(EXIT_FAILURE);
         	}
 		/*Update number of packets un-acked*/
@@ -412,19 +405,9 @@ int main(int argc, char *argv[]) {
                                 argv[0]);
                 exit(EXIT_FAILURE);
 	}
-
-
-	for(int i = 0; i < 50; i++){
-	    printf("Data: %d, Time: %d\n",i, i+5);
-	    fflush(stdout);  // Flush the output buffer
-	    sleep(5);
-
-	}
 	/*List of all packets weve received. All tracking metrics should be set when appended to*/
 	received_packets = ListCreate();
-
 	/*CMD Args + Declare locals*/
-
 	Segment* toSend;
     int num_send = atof(argv[1]);
 	PSIZE = atoi(argv[2]);
@@ -472,11 +455,11 @@ int main(int argc, char *argv[]) {
 	toSend = (Segment*)malloc(sizeof(Segment));
 	toSend->source_port = htons(myport);
 	if ((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        	perror("Socket creation failed");
+        	perror("Socket creation failed\n");
         	exit(EXIT_FAILURE);
     	}
     	if ((sock_fd_s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        	perror("Socket creation failed");
+        	perror("Socket creation failed\n");
         	exit(EXIT_FAILURE);
     	}
     	dest_addr.sin_family = AF_INET;
@@ -489,10 +472,10 @@ int main(int argc, char *argv[]) {
 
     	if(bind(sock_fd_s, (struct sockaddr *)&client_addr, sizeof(client_addr))
         	            == -1) {
-        	perror("Bind failed\n");
+        	perror("Bind failed client\n");
         	fflush(stdout);
         	close(sock_fd);
-        	printf("Rec and proc failed\n");
+        	printf("Rec and proc failed client\n");
         	fflush(stdout);
         	exit(-1);
     	}
