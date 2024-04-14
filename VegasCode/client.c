@@ -227,12 +227,12 @@ void print_all_stats_received(LIST* recd){
 		int tp_ind = current->throughput_ind;
 		total_time += rtt;
 
-		printf("Pack #%d: RTT:%f Throughput(bps, packet size = %d): %d Port: %d, trailing TP: %d\n",id, rtt,PSIZE, tp_ind, src, tp);
-		fflush(stdout);
+		//printf("Pack #%d: RTT:%f Throughput(bps, packet size = %d): %d Port: %d, trailing TP: %d\n",id, rtt,PSIZE, tp_ind, src, tp);
+		//fflush(stdout);
 		current=(Segment*)ListNext(recd);
 	}
-	printf("Total-transfer-time: %f/sec\n",time_sum);
-	fflush(stdout);
+	//printf("Total-transfer-time: %f/sec\n",time_sum);
+	//fflush(stdout);
 }
 double base_TP;
 int streak_;
@@ -247,9 +247,6 @@ void update_window(Segment* temp){
 	}
 	double extra_data = temp->rtt - base_rtt;
 
-
-
-
 	double expected = window_size /(double)base_rtt; //(double)base_TP; //window_size/(double)base_rtt; // dmin;
 	double actual =   window_size /(double)(temp->rtt);  //(double)temp->throughput; //window_size/(double)temp->rtt; //temp->rtt;
 	double diff = expected - actual;//expected-actual;
@@ -257,7 +254,6 @@ void update_window(Segment* temp){
 	update_diff_history(diff);						                /*DIFFS_10 ------- DIFFS_50------DIFFS_100*/
 	double diff_avg = moving_average(diffs_10,D1_index);			/* Short Term Average. 	Middle Term. 	Longterm       	*/
 	//printf("Moving_Avg_Diffs: %f\n", diff_avg);
-	fflush(stdout);
 	pthread_mutex_lock(&window_mtx);
 	if(temp->ws == window_size){/*Received packets window size is equal to current windowside === our analysis is more accurate to current env*/
 		streak_ +=1;
@@ -270,7 +266,6 @@ void update_window(Segment* temp){
 	}else{
 		if(is_max_bps() == 0){
 			//printf("hit_max\n");
-			fflush(stdout);
 		}else if(diff_avg < alpha){
 			window_size = window_size + 1;
 			streak_ = 0;
@@ -284,8 +279,9 @@ void update_window(Segment* temp){
 			;/*Keep windowsize the same*/
 		}
 	}
-	printf("P-LOG | Pack#: %d, Size: %d, RTT: %f, ED: %f, WS: %d, diff: %f, Ind TP: %d, Avg TP: %d, Base_RTT: %f, Base_TP: %f, CUR OUT: %d, expected: %f, actual: %f, Alpha: %f, Beta: %f, end_time: %f\n",temp->pack_id, PSIZE,temp->rtt,extra_data,window_size,diff, temp->throughput_ind, temp->throughput, base_rtt, base_TP, cur_out, expected, actual,alpha, beta, pack->end_time);
+	printf("P-LOG | Pack#: %d, Size: %d, RTT: %f, ED: %f, WS: %d, diff: %f, Ind TP: %d, Avg TP: %d, Base_RTT: %f, Base_TP: %f, CUR OUT: %d, expected: %f, actual: %f, Alpha: %f, Beta: %f, end_time: %s\n",temp->pack_id, PSIZE,temp->rtt,extra_data,window_size,diff, temp->throughput_ind, temp->throughput, base_rtt, base_TP, cur_out, expected, actual,alpha, beta, temp->end_time);
 	fflush(stdout);  // Flush the output buffer
+	fflush(stderr);
 	pthread_mutex_unlock(&window_mtx);
 }
 
@@ -354,23 +350,18 @@ void* rec_background_routine(void* arg){
         	    exit(EXIT_FAILURE);
         	}
 		/*Update number of packets un-acked*/
-	        pthread_mutex_lock(&cur_out_mutex);
+	    pthread_mutex_lock(&cur_out_mutex);
 		cur_out -=1;
 		pthread_mutex_unlock(&cur_out_mutex);
 
 		/*Process received packet */
-        	deserialize(data, temp);
+        deserialize(data, temp);
 		convert_pack_net_host(temp);
 
 		set_end_time(temp);
 		calc_rtt(temp);
-
-
 		update_throughput(temp);
-
 		//calculate_adaptive_thresholds();
-
-
 		ListAppend(received_packets, temp);
 		//printf("\n");
 		update_window(temp);
@@ -381,7 +372,7 @@ void launch_rec_background(pthread_t *receiver_thread, int num_send) {
 	ThreadArgs *args = (ThreadArgs *)malloc(sizeof(ThreadArgs));
     	if (args == NULL) {
         	fprintf(stderr, "Error allocating memory\n");
-        	fflush(stdout);  // Flush the output buffer
+        	fflush(stderr);  // Flush the output buffer
         	exit(EXIT_FAILURE);
     	}
 
@@ -389,8 +380,7 @@ void launch_rec_background(pthread_t *receiver_thread, int num_send) {
 
         if (pthread_create(receiver_thread, NULL, rec_background_routine, args) != 0) {
             	fprintf(stderr, "Error creating thread\n");
-            	fflush(stdout);  // Flush the output buffer
-
+            	fflush(stderr);  // Flush the output buffer
         	exit(EXIT_FAILURE);
     	}
 }
@@ -403,6 +393,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "Usage: %s <Number of packets to send>"
                                 "<Packet Size(Bytes)>,<myport>,<emulator port>\n",
                                 argv[0]);
+                fflush(stderr);
                 exit(EXIT_FAILURE);
 	}
 	/*List of all packets weve received. All tracking metrics should be set when appended to*/
@@ -423,8 +414,8 @@ int main(int argc, char *argv[]) {
 	streak_ = 0;
 	base_rtt = 100000.0; /* Keep base RTT at the smallest rtt recorded*/
 	window_size = 3;
-	alpha = .5;
-	beta = 1;
+	alpha = .2;
+	beta = .6;
 	avg_tp = 0;
 	total_bytes = 0;
 	start_time_str = current_unix_timestamp();
@@ -440,7 +431,7 @@ int main(int argc, char *argv[]) {
 	if (history == NULL) {
         	// Handle failure to allocate memory
         	fprintf(stderr, "Failed to allocate memory for history\n");
-        	fflush(stdout);
+        	fflush(stderr);
         	return 1; // Return a non-zero value to indicate failure
     	}
 	for (int i = 0; i < MAX_HISTORY_SIZE; ++i) {
@@ -473,10 +464,8 @@ int main(int argc, char *argv[]) {
     	if(bind(sock_fd_s, (struct sockaddr *)&client_addr, sizeof(client_addr))
         	            == -1) {
         	perror("Bind failed client\n");
-        	fflush(stdout);
+        	fflush(stderr);
         	close(sock_fd);
-        	printf("Rec and proc failed client\n");
-        	fflush(stdout);
         	exit(-1);
     	}
     	/*Launch receiver background thread*/
@@ -513,7 +502,7 @@ int main(int argc, char *argv[]) {
     }
 	if (pthread_join(receiver_thread, NULL) != 0) {
         	fprintf(stderr, "Error joining thread\n");
-        	fflush(stdout);
+        	fflush(stderr);
         	exit(EXIT_FAILURE);
     }
 
@@ -564,8 +553,8 @@ void calculate_adaptive_thresholds() {
     //alpha = (avg_throughput / window_size)*.005;
     alpha =  1/avg_throughput;
     beta = (avg_rtt / window_size)*1; // Example adjustment
-	printf("HISTORICAL ---  AVG TP:%f, AVG RTT: %f --- NEW A: %f, NEW B: %f\n", avg_throughput, avg_rtt, alpha, beta);
-	fflush(stdout);
+	//printf("HISTORICAL ---  AVG TP:%f, AVG RTT: %f --- NEW A: %f, NEW B: %f\n", avg_throughput, avg_rtt, alpha, beta);
+	//fflush(stdout);
 }
 
 double calculate_adaptive_timeout() {
